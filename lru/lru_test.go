@@ -16,33 +16,16 @@ limitations under the License.
 
 package lru
 
-import (
-	"fmt"
-	"testing"
-)
-
-type simpleStruct struct {
-	int
-	string
-}
-
-type complexStruct struct {
-	int
-	simpleStruct
-}
+import "testing"
 
 var getTests = []struct {
 	name       string
-	keyToAdd   interface{}
-	keyToGet   interface{}
+	keyToAdd   string
+	keyToGet   string
 	expectedOk bool
 }{
 	{"string_hit", "myKey", "myKey", true},
-	{"string_miss", "myKey", "nonsense", false},
-	{"simple_struct_hit", simpleStruct{1, "two"}, simpleStruct{1, "two"}, true},
-	{"simple_struct_miss", simpleStruct{1, "two"}, simpleStruct{0, "noway"}, false},
-	{"complex_struct_hit", complexStruct{1, simpleStruct{2, "three"}},
-		complexStruct{1, simpleStruct{2, "three"}}, true},
+	{"string_miss", "myKey", "notMyKey", false},
 }
 
 func TestGet(t *testing.T) {
@@ -73,25 +56,3 @@ func TestRemove(t *testing.T) {
 	}
 }
 
-func TestEvict(t *testing.T) {
-	evictedKeys := make([]Key, 0)
-	onEvictedFun := func(key Key, value interface{}) {
-		evictedKeys = append(evictedKeys, key)
-	}
-
-	lru := New(20)
-	lru.OnEvicted = onEvictedFun
-	for i := 0; i < 22; i++ {
-		lru.Add(fmt.Sprintf("myKey%d", i), 1234)
-	}
-
-	if len(evictedKeys) != 2 {
-		t.Fatalf("got %d evicted keys; want 2", len(evictedKeys))
-	}
-	if evictedKeys[0] != Key("myKey0") {
-		t.Fatalf("got %v in first evicted key; want %s", evictedKeys[0], "myKey0")
-	}
-	if evictedKeys[1] != Key("myKey1") {
-		t.Fatalf("got %v in second evicted key; want %s", evictedKeys[1], "myKey1")
-	}
-}

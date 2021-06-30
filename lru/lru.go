@@ -17,28 +17,29 @@ limitations under the License.
 // Package lru implements an LRU cache.
 package lru
 
-import "container/list"
+import (
+	"container/list"
+	"sync"
+)
 
 // Cache is an LRU cache. It is not safe for concurrent access.
 type Cache struct {
+	sync.Mutex
 	// MaxEntries is the maximum number of cache entries before
 	// an item is evicted. Zero means no limit.
 	MaxEntries int
 
 	// OnEvicted optionally specifies a callback function to be
 	// executed when an entry is purged from the cache.
-	OnEvicted func(key Key, value interface{})
+	OnEvicted func(key string, value float64)
 
 	ll    *list.List
-	cache map[interface{}]*list.Element
+	cache map[string]*list.Element
 }
 
-// A Key may be any value that is comparable. See http://golang.org/ref/spec#Comparison_operators
-type Key interface{}
-
 type entry struct {
-	key   Key
-	value interface{}
+	key   string
+	value float64
 }
 
 // New creates a new Cache.
@@ -48,14 +49,16 @@ func New(maxEntries int) *Cache {
 	return &Cache{
 		MaxEntries: maxEntries,
 		ll:         list.New(),
-		cache:      make(map[interface{}]*list.Element),
+		cache:      make(map[string]*list.Element),
 	}
 }
 
 // Add adds a value to the cache.
-func (c *Cache) Add(key Key, value interface{}) {
+func (c *Cache) Add(key string, value float64) {
+	c.Lock()
+	defer c.Unlock()
 	if c.cache == nil {
-		c.cache = make(map[interface{}]*list.Element)
+		c.cache = make(map[string]*list.Element)
 		c.ll = list.New()
 	}
 	if ee, ok := c.cache[key]; ok {
@@ -71,7 +74,9 @@ func (c *Cache) Add(key Key, value interface{}) {
 }
 
 // Get looks up a key's value from the cache.
-func (c *Cache) Get(key Key) (value interface{}, ok bool) {
+func (c *Cache) Get(key string) (value float64, ok bool) {
+	c.Lock()
+	defer c.Unlock()
 	if c.cache == nil {
 		return
 	}
@@ -83,7 +88,9 @@ func (c *Cache) Get(key Key) (value interface{}, ok bool) {
 }
 
 // Remove removes the provided key from the cache.
-func (c *Cache) Remove(key Key) {
+func (c *Cache) Remove(key string) {
+	c.Lock()
+	defer c.Unlock()
 	if c.cache == nil {
 		return
 	}
@@ -94,6 +101,8 @@ func (c *Cache) Remove(key Key) {
 
 // RemoveOldest removes the oldest item from the cache.
 func (c *Cache) RemoveOldest() {
+	c.Lock()
+	defer c.Unlock()
 	if c.cache == nil {
 		return
 	}
@@ -114,6 +123,8 @@ func (c *Cache) removeElement(e *list.Element) {
 
 // Len returns the number of items in the cache.
 func (c *Cache) Len() int {
+	c.Lock()
+	defer c.Unlock()
 	if c.cache == nil {
 		return 0
 	}
@@ -122,6 +133,8 @@ func (c *Cache) Len() int {
 
 // Clear purges all stored items from the cache.
 func (c *Cache) Clear() {
+	c.Lock()
+	defer c.Unlock()
 	if c.OnEvicted != nil {
 		for _, e := range c.cache {
 			kv := e.Value.(*entry)
